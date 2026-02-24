@@ -415,9 +415,11 @@ app.post('/api/videos', async (req, res) => {
     if (!titulo || !nicho || !tema) return res.status(400).json({ error: 'titulo, nicho e tema são obrigatórios' });
 
     const videoId = randomUUID();
+    const temaStr = String(tema || '').substring(0, 65000);
+    const tituloStr = String(titulo || '').substring(0, 250);
     await db.insert(videos).values({
-      id: videoId, userId, titulo, nicho, tema,
-      descricao: tema,
+      id: videoId, userId, titulo: tituloStr, nicho, tema: temaStr,
+      descricao: temaStr,
       duracao: duracao || '30',
       estiloNarracao: estiloNarracao || 'energetico',
       hookInicial: hookInicial || null,
