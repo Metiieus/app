@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import cron from 'node-cron';
 import { testConnection, db } from './db';
-import { videos, logs, agendamentos, imagensIA } from '../database/schema';
+import { videos, logs, agendamentos, imagensIA, users } from '../database/schema';
 import { eq, and, lte, desc, like } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
@@ -620,9 +620,29 @@ app.post('/scheduler/:acao', (req, res) => {
 // ============================================================
 // INICIAR
 // ============================================================
+async function ensureDevUser() {
+  const DEV_USER_ID = 'dev-user-001';
+  try {
+    const existing = await db.query.users.findFirst({ where: eq(users.id, DEV_USER_ID) });
+    if (!existing) {
+      await db.insert(users).values({
+        id: DEV_USER_ID,
+        openId: 'dev-open-id-001',
+        name: 'Dev User',
+        email: 'dev@tikfactory.local',
+        role: 'admin',
+      });
+      console.log('✅ Usuário dev criado no banco');
+    }
+  } catch (e) {
+    console.error('Aviso: não foi possível criar usuário dev:', e);
+  }
+}
+
 async function startServer() {
   const conectado = await testConnection();
   if (!conectado) { console.error('❌ Banco de dados não conectado'); process.exit(1); }
+  await ensureDevUser();
 
   app.listen(PORT, () => {
     console.log('');
