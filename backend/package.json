@@ -1,7 +1,7 @@
 {
-  "name": "rpmon-dashboard-backend",
-  "version": "1.0.0",
-  "description": "Backend do RPmon Dashboard - Automação de vídeos Pokémon + RPG",
+  "name": "tikfactory-backend",
+  "version": "2.0.0",
+  "description": "TikFactory — Máquina de vídeos automática para TikTok",
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
@@ -10,9 +10,10 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:migrate": "drizzle-kit migrate",
-    "db:generate": "drizzle-kit generate",
-    "db:studio": "drizzle-kit studio"
+    "db:generate": "drizzle-kit generate:mysql --config=../drizzle.config.ts",
+    "db:push": "drizzle-kit push:mysql --config=../drizzle.config.ts",
+    "db:migrate": "drizzle-kit push:mysql --config=../drizzle.config.ts",
+    "db:studio": "drizzle-kit studio --config=../drizzle.config.ts"
   },
   "dependencies": {
     "@trpc/server": "^11.10.0",
@@ -20,10 +21,8 @@
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.30.10",
     "express": "^4.22.1",
-    "googleapis": "^133.0.0",
     "mysql2": "^3.18.0",
     "node-cron": "^3.0.3",
-    "openai": "^4.28.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
