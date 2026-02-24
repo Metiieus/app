@@ -367,9 +367,33 @@ export function HistoricoPage() {
                             </div>
                             {video.videoUrl && (
                               <div>
-                                <h4 className="font-bold text-gray-900 text-sm mb-2">Preview</h4>
-                                <div className="aspect-[9/16] max-w-[200px] rounded-2xl bg-gray-100 flex items-center justify-center border border-gray-200">
-                                  <Play className="h-10 w-10 text-gray-400" />
+                                <h4 className="font-bold text-gray-900 text-sm mb-2">Preview do Vídeo</h4>
+                                <div className="flex gap-4 items-start">
+                                  <div className="aspect-[9/16] w-[160px] rounded-2xl overflow-hidden bg-black border border-gray-200 flex-shrink-0">
+                                    <video
+                                      src={`http://localhost:3001${video.videoUrl}`}
+                                      controls
+                                      className="w-full h-full object-contain"
+                                      poster={video.thumbnailUrl ? `http://localhost:3001${video.thumbnailUrl}` : undefined}
+                                    />
+                                  </div>
+                                  <div className="flex flex-col gap-2">
+                                    <a
+                                      href={`http://localhost:3001/download/${video.videoUrl.split('/').pop()}`}
+                                      download
+                                      className="inline-flex items-center gap-2 bg-[#ff0050] text-white text-xs font-bold px-3 py-2 rounded-xl hover:opacity-90"
+                                    >
+                                      ⬇️ Baixar MP4
+                                    </a>
+                                    <a
+                                      href={`http://localhost:3001${video.videoUrl}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-2 bg-gray-100 text-gray-700 text-xs font-bold px-3 py-2 rounded-xl hover:bg-gray-200"
+                                    >
+                                      🔗 Abrir no navegador
+                                    </a>
+                                  </div>
                                 </div>
                               </div>
                             )}

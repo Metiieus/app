@@ -9,6 +9,9 @@ import { testConnection, db } from './db';
 import { agendamentos, videos, logs } from '../database/schema';
 import { eq, and, lte } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -16,6 +19,99 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// ============================================================
+// SERVIR ARQUIVOS DE MÍDIA GERADOS
+// Os vídeos, áudios e imagens ficam em %TEMP%/tikfactory/
+// ============================================================
+const WORK_DIR = path.join(os.tmpdir(), 'tikfactory');
+const VIDEO_DIR = path.join(WORK_DIR, 'videos');
+const AUDIO_DIR = path.join(WORK_DIR, 'audio');
+const IMAGE_DIR = path.join(WORK_DIR, 'images');
+
+// Garantir que os diretórios existam
+[WORK_DIR, VIDEO_DIR, AUDIO_DIR, IMAGE_DIR].forEach(d => {
+  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+});
+
+console.log(`📁 Diretório de mídia: ${WORK_DIR}`);
+
+// Rota para baixar/visualizar vídeos
+app.get('/video/:filename', (req, res) => {
+  const filePath = path.join(VIDEO_DIR, req.params.filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Vídeo não encontrado', path: filePath });
+  }
+  const stat = fs.statSync(filePath);
+  const range = req.headers.range;
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+    const chunkSize = (end - start) + 1;
+    const file = fs.createReadStream(filePath, { start, end });
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunkSize,
+      'Content-Type': 'video/mp4',
+    });
+    file.pipe(res);
+  } else {
+    res.writeHead(200, { 'Content-Length': stat.size, 'Content-Type': 'video/mp4' });
+    fs.createReadStream(filePath).pipe(res);
+  }
+});
+
+// Rota para baixar vídeo diretamente
+app.get('/download/:filename', (req, res) => {
+  const filePath = path.join(VIDEO_DIR, req.params.filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Arquivo não encontrado' });
+  }
+  res.download(filePath);
+});
+
+// Rota para áudios
+app.get('/audio/:filename', (req, res) => {
+  const filePath = path.join(AUDIO_DIR, req.params.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Áudio não encontrado' });
+  res.setHeader('Content-Type', 'audio/mpeg');
+  fs.createReadStream(filePath).pipe(res);
+});
+
+// Rota para imagens
+app.get('/images/:filename', (req, res) => {
+  const filePath = path.join(IMAGE_DIR, req.params.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Imagem não encontrada' });
+  res.setHeader('Content-Type', 'image/png');
+  fs.createReadStream(filePath).pipe(res);
+});
+
+// Rota para thumbnails (usa primeira imagem do vídeo)
+app.get('/thumbnail/:filename', (req, res) => {
+  const base = req.params.filename.replace('.jpg', '');
+  const thumbPath = path.join(VIDEO_DIR, `${base}_thumb.jpg`);
+  const imgPath = path.join(IMAGE_DIR, `${base}_0.png`);
+  const filePath = fs.existsSync(thumbPath) ? thumbPath : fs.existsSync(imgPath) ? imgPath : null;
+  if (!filePath) return res.status(404).json({ error: 'Thumbnail não encontrada' });
+  res.setHeader('Content-Type', filePath.endsWith('.png') ? 'image/png' : 'image/jpeg');
+  fs.createReadStream(filePath).pipe(res);
+});
+
+// Listar todos os vídeos gerados
+app.get('/media/list', (req, res) => {
+  const files = fs.existsSync(VIDEO_DIR)
+    ? fs.readdirSync(VIDEO_DIR).filter(f => f.endsWith('.mp4')).map(f => ({
+        name: f,
+        url: `http://localhost:${PORT}/video/${f}`,
+        download: `http://localhost:${PORT}/download/${f}`,
+        size: fs.statSync(path.join(VIDEO_DIR, f)).size,
+        created: fs.statSync(path.join(VIDEO_DIR, f)).birthtime,
+      }))
+    : [];
+  res.json({ total: files.length, workDir: WORK_DIR, videos: files });
+});
 
 // Health check
 app.get('/health', (req, res) => {
