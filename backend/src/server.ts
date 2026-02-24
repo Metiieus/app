@@ -143,20 +143,39 @@ Responda APENAS com JSON válido:
   "hashtags": ["#hashtag1", "#hashtag2", "#hashtag3", "#hashtag4", "#hashtag5"]
 }`;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.9, maxOutputTokens: 1024 },
-      }),
-    }
-  );
+  // Tenta múltiplos modelos em ordem de preferência
+  const modelos = [
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro-latest',
+    'gemini-2.0-flash',
+  ];
 
-  if (!response.ok) throw new Error(`Gemini API erro: ${response.status} ${await response.text()}`);
-  const data = await response.json();
+  let data: any = null;
+  let lastError = '';
+  for (const modelo of modelos) {
+    try {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.9, maxOutputTokens: 1024 },
+          }),
+        }
+      );
+      if (resp.ok) { data = await resp.json(); console.log(`✅ Gemini modelo usado: ${modelo}`); break; }
+      const errText = await resp.text();
+      lastError = `${modelo}: ${resp.status} ${errText}`;
+      console.warn(`⚠️ Modelo ${modelo} falhou (${resp.status}), tentando próximo...`);
+    } catch (e) {
+      lastError = String(e);
+      console.warn(`⚠️ Modelo ${modelo} erro de rede, tentando próximo...`);
+    }
+  }
+  if (!data) throw new Error(`Todos os modelos Gemini falharam. Último erro: ${lastError}`);
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('JSON não encontrado na resposta do Gemini');
