@@ -10,10 +10,10 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:generate": "drizzle-kit generate:mysql --config=../drizzle.config.ts",
-    "db:push": "drizzle-kit push:mysql --config=../drizzle.config.ts",
-    "db:migrate": "drizzle-kit push:mysql --config=../drizzle.config.ts",
-    "db:studio": "drizzle-kit studio --config=../drizzle.config.ts"
+    "db:generate": "drizzle-kit generate:mysql",
+    "db:push": "drizzle-kit push:mysql",
+    "db:migrate": "drizzle-kit push:mysql",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@trpc/server": "^11.10.0",
