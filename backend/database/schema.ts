@@ -19,7 +19,7 @@ export const videos = mysqlTable('videos', {
   userId: varchar('user_id', { length: 36 }).notNull().references(() => users.id),
   titulo: varchar('titulo', { length: 255 }).notNull(),
   nicho: varchar('nicho', { length: 100 }).notNull().default('geral'),
-  tema: varchar('tema', { length: 255 }).notNull(),
+  tema: text('tema').notNull(),
   descricao: text('descricao').notNull(),
   duracao: varchar('duracao', { length: 10 }).notNull().default('30'),
   estiloNarracao: varchar('estilo_narracao', { length: 50 }).notNull().default('energetico'),
