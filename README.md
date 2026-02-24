@@ -8,7 +8,7 @@ O TikFactory é uma plataforma full-stack que integra IA, síntese de voz, proce
 
 Com ele você pode:
 - Gerar roteiros virais com **Gemini AI** em segundos
-- Criar narração realista com **Edge TTS** (voz brasileira)
+- Criar narração realista com **Edge TTS** (voz brasileira pt-BR)
 - Gerar imagens verticais **9:16** com **DALL-E**
 - Montar vídeos **1080x1920** com **FFmpeg** + legendas animadas
 - Publicar automaticamente via **TikTok API**
@@ -34,7 +34,7 @@ Com ele você pode:
 |---------|-----|-------------|
 | Gemini AI | Geração de roteiros virais | ✅ Sim |
 | Edge TTS | Síntese de voz em português | ✅ Sim |
-| TikTok API | Publicação automática | ✅ Para autopublicação |
+| TikTok API | Publicação automática | Para autopublicação |
 | DALL-E (OpenAI) | Geração de imagens 9:16 | Opcional |
 | ElevenLabs | Narração ultra-realista | Opcional |
 | FFmpeg | Montagem de vídeo | ✅ Sim |
@@ -43,77 +43,83 @@ Com ele você pode:
 
 ```
 app/
-├── backend/           # Backend Node.js + Express + tRPC
+├── backend/                  # Backend Node.js + Express + tRPC
 │   ├── src/
-│   │   ├── routers/   # Routers tRPC (videos, agendamentos, pipeline, logs)
-│   │   ├── db/        # Configuração Drizzle ORM
-│   │   ├── server.ts  # Servidor + Scheduler automático
-│   │   └── trpc.ts    # Configuração tRPC
+│   │   ├── routers/          # Routers tRPC (videos, agendamentos, pipeline, logs)
+│   │   ├── db/               # Configuração Drizzle ORM
+│   │   ├── server.ts         # Servidor + Scheduler automático
+│   │   └── trpc.ts           # Configuração tRPC
+│   ├── .env.example          # Variáveis de ambiente
 │   └── package.json
 ├── database/
-│   └── schema.ts      # Schema do banco (6 tabelas)
-├── src/               # Frontend React
-│   ├── pages/         # 6 páginas (Home, Criar, Histórico, Agendador, Painel, Config)
-│   ├── components/    # Layout, UI components
-│   └── lib/           # tRPC client
+│   └── schema.ts             # Schema do banco (6 tabelas)
+├── src/                      # Frontend React
+│   ├── pages/                # 6 páginas (Home, Criar, Histórico, Agendador, Painel, Config)
+│   ├── components/           # Layout, UI components
+│   └── lib/                  # tRPC client
+├── INSTALACAO_WINDOWS.md     # Guia completo para Windows
 └── package.json
 ```
 
 ## 🛠️ Instalação
 
-### Pré-requisitos
-- Node.js 20+
-- MySQL 8.0+ (ou TiDB)
-- FFmpeg (`apt-get install ffmpeg`)
-- Python 3.8+ com edge-tts (`pip install edge-tts`)
+### Windows (recomendado)
 
-### 1. Clone o repositório
+Veja o guia completo: **[INSTALACAO_WINDOWS.md](INSTALACAO_WINDOWS.md)**
 
-```bash
+**Resumo rápido:**
+
+```cmd
+# 1. Instalar dependências do sistema
+winget install Gyan.FFmpeg
+pip install edge-tts
+
+# 2. Clonar e configurar
 git clone https://github.com/Metiieus/app.git
 cd app
-```
-
-### 2. Configure o Backend
-
-```bash
 cd backend
-cp .env.example .env
-# Edite .env com suas chaves de API
+copy .env.example .env
+rem Edite .env com suas chaves de API
 npm install
-```
 
-### 3. Configure o Banco de Dados
-
-```bash
-# Crie o banco de dados
+# 3. Banco de dados
 mysql -u root -p -e "CREATE DATABASE tikfactory;"
-
-# Execute as migrations
 npm run db:migrate
-```
 
-### 4. Configure o Frontend
-
-```bash
+# 4. Frontend
 cd ..
 npm install
+
+# 5. Iniciar (dois terminais)
+cd backend && npm run dev   # Terminal 1
+npm run dev                 # Terminal 2
 ```
 
-### 5. Inicie o sistema
+### Linux/Mac
 
 ```bash
-# Terminal 1 — Backend
-cd backend && npm run dev
+# Dependências
+sudo apt-get install ffmpeg    # Ubuntu/Debian
+brew install ffmpeg            # Mac
+pip install edge-tts
 
-# Terminal 2 — Frontend
+# Instalar e rodar
+git clone https://github.com/Metiieus/app.git && cd app
+cd backend && cp .env.example .env
+npm install && cd .. && npm install
+
+# Banco de dados
+mysql -u root -p -e "CREATE DATABASE tikfactory;"
+cd backend && npm run db:migrate
+
+# Iniciar
+cd backend && npm run dev &
 npm run dev
 ```
 
 Acesse em:
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:3001
-- **tRPC**: http://localhost:3001/trpc
 
 ## 🔑 Configuração de APIs
 
@@ -171,7 +177,7 @@ Acesse **Configurações** no dashboard e configure:
 2. Narração (Edge TTS)
    ↓ Voz brasileira pt-BR, estilo configurável
 3. Imagens (DALL-E)
-   ↓ Formato 9:16 (1080x1920), otimizado por nicho
+   ↓ Formato 9:16 (1080x1920), prompts por nicho
 4. Vídeo (FFmpeg)
    ↓ MP4 1080x1920 30fps + legendas animadas
 5. Thumbnail
@@ -180,17 +186,18 @@ Acesse **Configurações** no dashboard e configure:
    ↓ Upload + hashtags + configurações de privacidade
 ```
 
-## 🚀 Deploy
+## 🚀 Build para Produção
 
-```bash
-# Build do Frontend
+**Windows:**
+```cmd
 npm run build
+cd backend && npm run build && npm start
+```
 
-# Build do Backend
-cd backend && npm run build
-
-# Iniciar em produção
-npm start
+**Linux:**
+```bash
+npm run build
+cd backend && npm run build && npm start
 ```
 
 ## 📄 Licença
@@ -200,4 +207,5 @@ MIT License — veja [LICENSE](LICENSE) para detalhes.
 ---
 
 **Versão**: 2.0.0 (TikTok Edition)
+**Compatível com**: Windows 10/11, Linux, macOS
 **Última atualização**: Fevereiro 2026
