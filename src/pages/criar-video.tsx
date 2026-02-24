@@ -1,22 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Wand2, Loader2, Zap, Music, Type, Sparkles, Clock } from 'lucide-react';
+import { ArrowLeft, Wand2, Loader2, Zap, Music, Type, Sparkles, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+
+const API = 'http://localhost:3001';
 
 const nichosTikTok = [
   { value: 'motivacional', label: '💪 Motivacional', desc: 'Frases e histórias inspiradoras' },
@@ -46,20 +41,31 @@ const estilosNarracao = [
   { value: 'informativo', label: '📢 Informativo', desc: 'Claro e direto' },
 ];
 
-const etapas = [
-  { id: 'roteiro', nome: 'Roteiro Viral', descricao: 'Gerando roteiro otimizado para TikTok...', icon: '📝' },
-  { id: 'narracao', nome: 'Narração', descricao: 'Sintetizando voz com IA...', icon: '🎙️' },
-  { id: 'imagem', nome: 'Imagens', descricao: 'Criando visuais impactantes...', icon: '🎨' },
-  { id: 'video', nome: 'Montagem', descricao: 'Montando vídeo 9:16 para TikTok...', icon: '🎬' },
-  { id: 'thumbnail', nome: 'Thumbnail', descricao: 'Gerando capa atrativa...', icon: '🖼️' },
-];
+interface LogEntry {
+  id: string;
+  tipo: string;
+  etapa: string;
+  mensagem: string;
+  criadoEm: string;
+}
+
+interface PipelineStatus {
+  status: string;
+  progresso: number;
+  logs: LogEntry[];
+  videoUrl?: string;
+  thumbnailUrl?: string;
+}
 
 export function CriarVideoPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [etapaAtual, setEtapaAtual] = useState(0);
+  const [videoId, setVideoId] = useState<string | null>(null);
+  const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+
   const [formData, setFormData] = useState({
     titulo: '',
     nicho: '',
@@ -67,46 +73,99 @@ export function CriarVideoPage() {
     duracao: '30',
     estiloNarracao: 'energetico',
     hookInicial: '',
-    usarIA: true,
     legendasAnimadas: true,
     musicaTrending: true,
     efeitos: true,
     autoPublicar: false,
   });
 
+  // Polling do status do pipeline
+  useEffect(() => {
+    if (!videoId) return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`${API}/api/pipeline/${videoId}/status`, {
+          headers: { 'x-user-id': 'dev-user-001' },
+        });
+        if (!res.ok) return;
+        const data: PipelineStatus = await res.json();
+        setPipelineStatus(data);
+
+        if (data.status === 'concluido' || data.status === 'publicado') {
+          clearInterval(pollingRef.current!);
+          setIsLoading(false);
+          toast({
+            title: '🎉 Vídeo criado com sucesso!',
+            description: 'Acesse o Histórico para assistir e baixar.',
+          });
+        } else if (data.status === 'erro') {
+          clearInterval(pollingRef.current!);
+          setIsLoading(false);
+          toast({
+            title: '❌ Erro ao gerar vídeo',
+            description: 'Verifique os logs abaixo para mais detalhes.',
+            variant: 'destructive',
+          });
+        }
+      } catch (e) {
+        console.error('Polling erro:', e);
+      }
+    };
+
+    pollingRef.current = setInterval(poll, 2000);
+    poll(); // primeira chamada imediata
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+  }, [videoId]);
+
+  // Auto-scroll nos logs
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [pipelineStatus?.logs]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setProgress(0);
-    setEtapaAtual(0);
-
-    for (let i = 0; i < etapas.length; i++) {
-      setEtapaAtual(i);
-      setProgress(((i + 1) / etapas.length) * 100);
-      await new Promise((resolve) => setTimeout(resolve, 1800));
+    if (!formData.titulo || !formData.nicho || !formData.tema) {
+      toast({ title: 'Preencha todos os campos obrigatórios', variant: 'destructive' });
+      return;
     }
 
-    toast({
-      title: '🎉 Vídeo criado com sucesso!',
-      description: 'Seu vídeo TikTok está pronto para publicação.',
-    });
+    setIsLoading(true);
+    setPipelineStatus(null);
 
-    setIsLoading(false);
-    navigate('/historico');
+    try {
+      const res = await fetch(`${API}/api/videos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': 'dev-user-001' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Erro ao criar vídeo');
+      }
+
+      const data = await res.json();
+      setVideoId(data.videoId);
+      toast({ title: '🚀 Pipeline iniciado!', description: 'Gerando seu vídeo TikTok...' });
+    } catch (e) {
+      setIsLoading(false);
+      toast({ title: '❌ Erro', description: String(e), variant: 'destructive' });
+    }
   };
 
-  const nichoSelecionado = nichosTikTok.find(n => n.value === formData.nicho);
+  const logIcon = (tipo: string) => {
+    if (tipo === 'sucesso') return <CheckCircle2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />;
+    if (tipo === 'erro') return <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />;
+    if (tipo === 'aviso') return <AlertCircle className="h-3.5 w-3.5 text-yellow-500 flex-shrink-0" />;
+    return <Loader2 className="h-3.5 w-3.5 text-blue-500 flex-shrink-0 animate-spin" />;
+  };
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/')}
-          className="rounded-xl"
-        >
+        <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="rounded-xl" disabled={isLoading}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
@@ -169,7 +228,6 @@ export function CriarVideoPage() {
                 className="rounded-xl border-gray-200"
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="tema" className="font-semibold text-gray-700">Tema / Assunto Principal</Label>
               <Textarea
@@ -183,7 +241,6 @@ export function CriarVideoPage() {
                 className="rounded-xl border-gray-200 resize-none"
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="hookInicial" className="font-semibold text-gray-700">
                 Hook Inicial <span className="text-gray-400 font-normal">(opcional)</span>
@@ -219,9 +276,7 @@ export function CriarVideoPage() {
                     disabled={isLoading}
                     onClick={() => setFormData({ ...formData, duracao: d.value })}
                     className={`w-full rounded-xl border p-3 text-left transition-all duration-200 ${
-                      formData.duracao === d.value
-                        ? 'border-[#ff0050] bg-[#ff0050]/5'
-                        : 'border-gray-100 bg-white hover:border-gray-200'
+                      formData.duracao === d.value ? 'border-[#ff0050] bg-[#ff0050]/5' : 'border-gray-100 bg-white hover:border-gray-200'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -250,9 +305,7 @@ export function CriarVideoPage() {
                     disabled={isLoading}
                     onClick={() => setFormData({ ...formData, estiloNarracao: e.value })}
                     className={`w-full rounded-xl border p-3 text-left transition-all duration-200 ${
-                      formData.estiloNarracao === e.value
-                        ? 'border-[#ff0050] bg-[#ff0050]/5'
-                        : 'border-gray-100 bg-white hover:border-gray-200'
+                      formData.estiloNarracao === e.value ? 'border-[#ff0050] bg-[#ff0050]/5' : 'border-gray-100 bg-white hover:border-gray-200'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -266,7 +319,7 @@ export function CriarVideoPage() {
           </Card>
         </div>
 
-        {/* Opções Avançadas */}
+        {/* Opções */}
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-bold flex items-center gap-2">
@@ -277,34 +330,27 @@ export function CriarVideoPage() {
           <CardContent>
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                { id: 'usarIA', label: '🤖 Imagens com IA', desc: 'Gerar visuais com DALL-E' },
                 { id: 'legendasAnimadas', label: '💬 Legendas Animadas', desc: 'Estilo CapCut viral' },
                 { id: 'musicaTrending', label: '🎵 Música Trending', desc: 'Sons em alta no TikTok' },
                 { id: 'efeitos', label: '✨ Efeitos Dinâmicos', desc: 'Zoom, pan e transições' },
-                { id: 'autoPublicar', label: '🚀 Auto-publicar', desc: 'Postar automaticamente' },
+                { id: 'autoPublicar', label: '🚀 Auto-publicar', desc: 'Postar automaticamente no TikTok' },
               ].map((opcao) => (
                 <div
                   key={opcao.id}
                   className={`flex items-start gap-3 rounded-xl border p-3 transition-all cursor-pointer ${
-                    formData[opcao.id as keyof typeof formData]
-                      ? 'border-[#ff0050]/30 bg-[#ff0050]/5'
-                      : 'border-gray-100 bg-white'
+                    formData[opcao.id as keyof typeof formData] ? 'border-[#ff0050]/30 bg-[#ff0050]/5' : 'border-gray-100 bg-white'
                   }`}
                   onClick={() => !isLoading && setFormData({ ...formData, [opcao.id]: !formData[opcao.id as keyof typeof formData] })}
                 >
                   <Checkbox
                     id={opcao.id}
                     checked={formData[opcao.id as keyof typeof formData] as boolean}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, [opcao.id]: checked as boolean })
-                    }
+                    onCheckedChange={(checked) => setFormData({ ...formData, [opcao.id]: checked as boolean })}
                     disabled={isLoading}
                     className="mt-0.5"
                   />
                   <div>
-                    <Label htmlFor={opcao.id} className="font-semibold text-sm text-gray-900 cursor-pointer">
-                      {opcao.label}
-                    </Label>
+                    <Label htmlFor={opcao.id} className="font-semibold text-sm text-gray-900 cursor-pointer">{opcao.label}</Label>
                     <p className="text-xs text-gray-500">{opcao.desc}</p>
                   </div>
                 </div>
@@ -313,45 +359,64 @@ export function CriarVideoPage() {
           </CardContent>
         </Card>
 
-        {/* Progresso */}
-        {isLoading && (
+        {/* Progresso em tempo real */}
+        {(isLoading || pipelineStatus) && (
           <Card className="border-0 shadow-sm bg-gradient-to-br from-[#ff0050]/5 to-[#00f2ea]/5">
-            <CardContent className="pt-6">
+            <CardContent className="pt-5 pb-5">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{etapas[etapaAtual]?.icon}</span>
-                    <span className="font-bold text-gray-900">{etapas[etapaAtual]?.nome}</span>
+                  <span className="font-bold text-gray-900">
+                    {pipelineStatus?.status === 'concluido' ? '✅ Vídeo pronto!' :
+                     pipelineStatus?.status === 'erro' ? '❌ Erro no pipeline' :
+                     '⚙️ Gerando vídeo...'}
+                  </span>
+                  <span className="text-sm font-bold text-[#ff0050]">{pipelineStatus?.progresso ?? 0}%</span>
+                </div>
+                <Progress value={pipelineStatus?.progresso ?? 0} className="h-2.5 bg-gray-100" />
+
+                {/* Logs em tempo real */}
+                {pipelineStatus?.logs && pipelineStatus.logs.length > 0 && (
+                  <div className="bg-gray-900 rounded-xl p-3 max-h-48 overflow-y-auto space-y-1.5">
+                    {[...pipelineStatus.logs].reverse().map((log) => (
+                      <div key={log.id} className="flex items-start gap-2 text-xs">
+                        {logIcon(log.tipo)}
+                        <span className={`${
+                          log.tipo === 'sucesso' ? 'text-green-400' :
+                          log.tipo === 'erro' ? 'text-red-400' :
+                          log.tipo === 'aviso' ? 'text-yellow-400' :
+                          'text-blue-300'
+                        }`}>{log.mensagem}</span>
+                      </div>
+                    ))}
+                    <div ref={logsEndRef} />
                   </div>
-                  <span className="text-sm font-bold text-[#ff0050]">{Math.round(progress)}%</span>
-                </div>
-                <Progress value={progress} className="h-2.5 bg-gray-100" />
-                <p className="text-sm text-gray-500">{etapas[etapaAtual]?.descricao}</p>
-                <div className="flex gap-2">
-                  {etapas.map((etapa, index) => (
-                    <div
-                      key={etapa.id}
-                      className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
-                        index < etapaAtual
-                          ? 'bg-[#ff0050]'
-                          : index === etapaAtual
-                          ? 'bg-gradient-to-r from-[#ff0050] to-[#00f2ea] animate-pulse'
-                          : 'bg-gray-200'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {etapas.map((etapa, index) => (
-                    <Badge
-                      key={etapa.id}
-                      variant={index <= etapaAtual ? 'default' : 'secondary'}
-                      className={`text-xs ${index <= etapaAtual ? 'bg-[#ff0050] text-white' : ''}`}
-                    >
-                      {etapa.icon} {etapa.nome}
-                    </Badge>
-                  ))}
-                </div>
+                )}
+
+                {/* Preview do vídeo quando pronto */}
+                {pipelineStatus?.status === 'concluido' && pipelineStatus.videoUrl && (
+                  <div className="flex gap-4 items-start pt-2">
+                    <div className="aspect-[9/16] w-[120px] rounded-xl overflow-hidden bg-black border border-gray-700 flex-shrink-0">
+                      <video
+                        src={`${API}${pipelineStatus.videoUrl}`}
+                        controls
+                        className="w-full h-full object-contain"
+                        poster={pipelineStatus.thumbnailUrl ? `${API}${pipelineStatus.thumbnailUrl}` : undefined}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2 pt-1">
+                      <a
+                        href={`${API}/download/${pipelineStatus.videoUrl.split('/').pop()}`}
+                        download
+                        className="inline-flex items-center gap-2 bg-[#ff0050] text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:opacity-90"
+                      >
+                        ⬇️ Baixar MP4
+                      </a>
+                      <Button variant="outline" size="sm" className="rounded-xl text-xs" onClick={() => navigate('/historico')}>
+                        Ver no Histórico
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -359,13 +424,7 @@ export function CriarVideoPage() {
 
         {/* Botões */}
         <div className="flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate('/')}
-            disabled={isLoading}
-            className="rounded-xl"
-          >
+          <Button type="button" variant="outline" onClick={() => navigate('/')} disabled={isLoading} className="rounded-xl">
             Cancelar
           </Button>
           <Button
@@ -374,15 +433,9 @@ export function CriarVideoPage() {
             className="flex-1 bg-gradient-to-r from-[#ff0050] to-[#ff4d7d] hover:opacity-90 text-white font-bold shadow-lg shadow-[#ff0050]/20 rounded-xl h-11"
           >
             {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Gerando vídeo viral...
-              </>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Gerando vídeo viral...</>
             ) : (
-              <>
-                <Wand2 className="mr-2 h-4 w-4" />
-                Gerar Vídeo TikTok
-              </>
+              <><Wand2 className="mr-2 h-4 w-4" />Gerar Vídeo TikTok</>
             )}
           </Button>
         </div>
