@@ -1,9 +1,10 @@
 import { mysqlTable, varchar, text, datetime, json, boolean, mysqlEnum, int } from 'drizzle-orm/mysql-core';
 import { sql } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
 
 // Tabela de usuários
 export const users = mysqlTable('users', {
-  id: varchar('id', { length: 36 }).primaryKey().default(sql`UUID()`),
+  id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   openId: varchar('open_id', { length: 255 }).notNull().unique(),
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
@@ -14,7 +15,7 @@ export const users = mysqlTable('users', {
 
 // Tabela de vídeos TikTok
 export const videos = mysqlTable('videos', {
-  id: varchar('id', { length: 36 }).primaryKey().default(sql`UUID()`),
+  id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   userId: varchar('user_id', { length: 36 }).notNull().references(() => users.id),
   titulo: varchar('titulo', { length: 255 }).notNull(),
   nicho: varchar('nicho', { length: 100 }).notNull().default('geral'),
@@ -49,7 +50,7 @@ export const videos = mysqlTable('videos', {
 
 // Tabela de agendamentos
 export const agendamentos = mysqlTable('agendamentos', {
-  id: varchar('id', { length: 36 }).primaryKey().default(sql`UUID()`),
+  id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   userId: varchar('user_id', { length: 36 }).notNull().references(() => users.id),
   nicho: varchar('nicho', { length: 100 }).notNull(),
   descricao: text('descricao').notNull(),
@@ -64,7 +65,7 @@ export const agendamentos = mysqlTable('agendamentos', {
 
 // Tabela de logs
 export const logs = mysqlTable('logs', {
-  id: varchar('id', { length: 36 }).primaryKey().default(sql`UUID()`),
+  id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   userId: varchar('user_id', { length: 36 }).notNull().references(() => users.id),
   videoId: varchar('video_id', { length: 36 }).references(() => videos.id),
   tipo: mysqlEnum('tipo', ['info', 'sucesso', 'erro', 'aviso']).notNull(),
@@ -76,7 +77,7 @@ export const logs = mysqlTable('logs', {
 
 // Tabela de imagens geradas por IA
 export const imagensIA = mysqlTable('imagens_ia', {
-  id: varchar('id', { length: 36 }).primaryKey().default(sql`UUID()`),
+  id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   userId: varchar('user_id', { length: 36 }).notNull().references(() => users.id),
   videoId: varchar('video_id', { length: 36 }).references(() => videos.id),
   prompt: text('prompt').notNull(),
@@ -88,7 +89,7 @@ export const imagensIA = mysqlTable('imagens_ia', {
 
 // Tabela de configurações
 export const configuracoes = mysqlTable('configuracoes', {
-  id: varchar('id', { length: 36 }).primaryKey().default(sql`UUID()`),
+  id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   userId: varchar('user_id', { length: 36 }).notNull().references(() => users.id),
   chave: varchar('chave', { length: 100 }).notNull(),
   valor: text('valor').notNull(),
