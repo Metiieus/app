@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, text, datetime, json, boolean, mysqlEnum } from 'drizzle-orm/mysql-core';
+import { mysqlTable, varchar, text, datetime, json, boolean, mysqlEnum, int } from 'drizzle-orm/mysql-core';
 import { sql } from 'drizzle-orm';
 
 // Tabela de usuários
@@ -12,21 +12,36 @@ export const users = mysqlTable('users', {
   updatedAt: datetime('updated_at').notNull().default(sql`NOW()`),
 });
 
-// Tabela de vídeos
+// Tabela de vídeos TikTok
 export const videos = mysqlTable('videos', {
   id: varchar('id', { length: 36 }).primaryKey().default(sql`UUID()`),
   userId: varchar('user_id', { length: 36 }).notNull().references(() => users.id),
   titulo: varchar('titulo', { length: 255 }).notNull(),
+  nicho: varchar('nicho', { length: 100 }).notNull().default('geral'),
   tema: varchar('tema', { length: 255 }).notNull(),
   descricao: text('descricao').notNull(),
+  duracao: varchar('duracao', { length: 10 }).notNull().default('30'),
+  estiloNarracao: varchar('estilo_narracao', { length: 50 }).notNull().default('energetico'),
+  hookInicial: text('hook_inicial'),
   status: mysqlEnum('status', ['pendente', 'processando', 'concluido', 'erro', 'publicado']).notNull().default('pendente'),
   roteiro: text('roteiro'),
   hashtags: json('hashtags').$type<string[]>().default([]),
   audioUrl: varchar('audio_url', { length: 500 }),
   videoUrl: varchar('video_url', { length: 500 }),
   thumbnailUrl: varchar('thumbnail_url', { length: 500 }),
-  youtubeVideoId: varchar('youtube_video_id', { length: 50 }),
-  youtubeUrl: varchar('youtube_url', { length: 500 }),
+  // Campos TikTok
+  tiktokVideoId: varchar('tiktok_video_id', { length: 100 }),
+  tiktokUrl: varchar('tiktok_url', { length: 500 }),
+  tiktokViews: int('tiktok_views').default(0),
+  tiktokLikes: int('tiktok_likes').default(0),
+  tiktokShares: int('tiktok_shares').default(0),
+  tiktokComments: int('tiktok_comments').default(0),
+  // Opções de produção
+  usarIA: boolean('usar_ia').notNull().default(true),
+  legendasAnimadas: boolean('legendas_animadas').notNull().default(true),
+  musicaTrending: boolean('musica_trending').notNull().default(true),
+  efeitos: boolean('efeitos').notNull().default(true),
+  autoPublicar: boolean('auto_publicar').notNull().default(false),
   erro: text('erro'),
   criadoEm: datetime('criado_em').notNull().default(sql`NOW()`),
   publicadoEm: datetime('publicado_em'),
@@ -36,12 +51,14 @@ export const videos = mysqlTable('videos', {
 export const agendamentos = mysqlTable('agendamentos', {
   id: varchar('id', { length: 36 }).primaryKey().default(sql`UUID()`),
   userId: varchar('user_id', { length: 36 }).notNull().references(() => users.id),
-  tema: varchar('tema', { length: 255 }).notNull(),
+  nicho: varchar('nicho', { length: 100 }).notNull(),
   descricao: text('descricao').notNull(),
   tipo: mysqlEnum('tipo', ['uma_vez', 'diaria', 'semanal', 'mensal']).notNull(),
+  horario: varchar('horario', { length: 5 }).notNull().default('18:00'),
   proximaExecucao: datetime('proxima_execucao').notNull(),
   ultimaExecucao: datetime('ultima_execucao'),
   ativo: boolean('ativo').notNull().default(true),
+  videosGerados: int('videos_gerados').notNull().default(0),
   criadoEm: datetime('criado_em').notNull().default(sql`NOW()`),
 });
 
@@ -65,6 +82,7 @@ export const imagensIA = mysqlTable('imagens_ia', {
   prompt: text('prompt').notNull(),
   url: varchar('url', { length: 500 }).notNull(),
   modelo: varchar('modelo', { length: 100 }).notNull(),
+  formato: varchar('formato', { length: 20 }).notNull().default('1080x1920'),
   criadoEm: datetime('criado_em').notNull().default(sql`NOW()`),
 });
 

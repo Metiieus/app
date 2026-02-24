@@ -7,7 +7,6 @@ import { HistoricoPage } from './pages/historico';
 import { AgendadorPage } from './pages/agendador';
 import { PainelControlePage } from './pages/painel-controle';
 import { ConfiguracoesPage } from './pages/configuracoes';
-import { TesteModulosPage } from './pages/teste-modulos';
 import { Toaster } from '@/components/ui/sonner';
 
 function App() {
@@ -22,7 +21,6 @@ function App() {
             <Route path="/agendador" element={<AgendadorPage />} />
             <Route path="/painel" element={<PainelControlePage />} />
             <Route path="/configuracoes" element={<ConfiguracoesPage />} />
-            <Route path="/teste" element={<TesteModulosPage />} />
           </Routes>
         </Layout>
         <Toaster />

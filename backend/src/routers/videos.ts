@@ -5,51 +5,64 @@ import { videos, logs } from '../../database/schema';
 import { eq, and, desc, like } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
-// Schema de validação para criação de vídeo
+// Schema de validação para criação de vídeo TikTok
 const createVideoSchema = z.object({
   titulo: z.string().min(1, 'Título é obrigatório'),
+  nicho: z.string().min(1, 'Nicho é obrigatório'),
   tema: z.string().min(1, 'Tema é obrigatório'),
   descricao: z.string().min(1, 'Descrição é obrigatória'),
-  usarIA: z.boolean().default(false),
-  legendas: z.boolean().default(false),
-  efeitos: z.boolean().default(false),
+  duracao: z.string().default('30'),
+  estiloNarracao: z.string().default('energetico'),
+  hookInicial: z.string().optional(),
+  usarIA: z.boolean().default(true),
+  legendasAnimadas: z.boolean().default(true),
+  musicaTrending: z.boolean().default(true),
+  efeitos: z.boolean().default(true),
+  autoPublicar: z.boolean().default(false),
 });
 
 // Schema para filtros de listagem
 const listVideosSchema = z.object({
   status: z.enum(['todos', 'pendente', 'processando', 'concluido', 'erro', 'publicado']).default('todos'),
-  dataInicio: z.date().optional(),
-  dataFim: z.date().optional(),
+  nicho: z.string().optional(),
   busca: z.string().optional(),
   page: z.number().default(1),
-  limit: z.number().default(10),
+  limit: z.number().default(20),
 });
 
 export const videosRouter = router({
-  // Criar novo vídeo
+  // Criar novo vídeo TikTok
   create: protectedProcedure
     .input(createVideoSchema)
     .mutation(async ({ ctx, input }) => {
       const videoId = randomUUID();
-      
+
       await db.insert(videos).values({
         id: videoId,
         userId: ctx.user!.id,
         titulo: input.titulo,
+        nicho: input.nicho,
         tema: input.tema,
         descricao: input.descricao,
+        duracao: input.duracao,
+        estiloNarracao: input.estiloNarracao,
+        hookInicial: input.hookInicial,
         status: 'pendente',
         hashtags: [],
+        usarIA: input.usarIA,
+        legendasAnimadas: input.legendasAnimadas,
+        musicaTrending: input.musicaTrending,
+        efeitos: input.efeitos,
+        autoPublicar: input.autoPublicar,
       });
 
-      // Criar log
       await db.insert(logs).values({
         id: randomUUID(),
         userId: ctx.user!.id,
-        videoId: videoId,
+        videoId,
         tipo: 'info',
         etapa: 'geral',
-        mensagem: `Vídeo "${input.titulo}" criado com sucesso`,
+        mensagem: `Vídeo TikTok "${input.titulo}" criado — nicho: ${input.nicho}`,
       });
 
       return { success: true, videoId };
@@ -59,7 +72,7 @@ export const videosRouter = router({
   list: protectedProcedure
     .input(listVideosSchema)
     .query(async ({ ctx, input }) => {
-      const { status, dataInicio, dataFim, busca, page, limit } = input;
+      const { status, nicho, busca, page, limit } = input;
       const offset = (page - 1) * limit;
 
       let conditions = eq(videos.userId, ctx.user!.id);
@@ -68,32 +81,25 @@ export const videosRouter = router({
         conditions = and(conditions, eq(videos.status, status))!;
       }
 
-      if (dataInicio) {
-        conditions = and(conditions, desc(videos.criadoEm))!;
+      if (nicho) {
+        conditions = and(conditions, eq(videos.nicho, nicho))!;
       }
 
       if (busca) {
-        conditions = and(
-          conditions,
-          like(videos.titulo, `%${busca}%`)
-        )!;
+        conditions = and(conditions, like(videos.titulo, `%${busca}%`))!;
       }
 
-      const [items, total] = await Promise.all([
-        db.query.videos.findMany({
-          where: conditions,
-          orderBy: desc(videos.criadoEm),
-          limit,
-          offset,
-        }),
-        db.select({ count: db.fn.count() }).from(videos).where(conditions),
-      ]);
+      const items = await db.query.videos.findMany({
+        where: conditions,
+        orderBy: desc(videos.criadoEm),
+        limit,
+        offset,
+      });
 
       return {
         items,
-        total: total[0].count,
         page,
-        totalPages: Math.ceil(total[0].count / limit),
+        hasMore: items.length === limit,
       };
     }),
 
@@ -120,6 +126,7 @@ export const videosRouter = router({
     .input(z.object({
       id: z.string(),
       titulo: z.string().optional(),
+      nicho: z.string().optional(),
       tema: z.string().optional(),
       descricao: z.string().optional(),
       status: z.enum(['pendente', 'processando', 'concluido', 'erro', 'publicado']).optional(),
@@ -128,8 +135,10 @@ export const videosRouter = router({
       audioUrl: z.string().optional(),
       videoUrl: z.string().optional(),
       thumbnailUrl: z.string().optional(),
-      youtubeVideoId: z.string().optional(),
-      youtubeUrl: z.string().optional(),
+      tiktokVideoId: z.string().optional(),
+      tiktokUrl: z.string().optional(),
+      tiktokViews: z.number().optional(),
+      tiktokLikes: z.number().optional(),
       erro: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -138,17 +147,6 @@ export const videosRouter = router({
       await db.update(videos)
         .set(data)
         .where(and(eq(videos.id, id), eq(videos.userId, ctx.user!.id)));
-
-      // Criar log
-      await db.insert(logs).values({
-        id: randomUUID(),
-        userId: ctx.user!.id,
-        videoId: id,
-        tipo: 'info',
-        etapa: 'geral',
-        mensagem: `Vídeo atualizado`,
-        detalhes: JSON.stringify(data),
-      });
 
       return { success: true };
     }),
@@ -160,20 +158,10 @@ export const videosRouter = router({
       await db.delete(videos)
         .where(and(eq(videos.id, input.id), eq(videos.userId, ctx.user!.id)));
 
-      // Criar log
-      await db.insert(logs).values({
-        id: randomUUID(),
-        userId: ctx.user!.id,
-        videoId: input.id,
-        tipo: 'info',
-        etapa: 'geral',
-        mensagem: `Vídeo deletado`,
-      });
-
       return { success: true };
     }),
 
-  // Obter estatísticas para dashboard
+  // Estatísticas do dashboard TikTok
   stats: protectedProcedure
     .query(async ({ ctx }) => {
       const userVideos = await db.query.videos.findMany({
@@ -183,7 +171,9 @@ export const videosRouter = router({
       const total = userVideos.length;
       const publicados = userVideos.filter(v => v.status === 'publicado').length;
       const comErro = userVideos.filter(v => v.status === 'erro').length;
-      const taxaSucesso = total > 0 ? Math.round((publicados / total) * 100) : 0;
+      const taxaSucesso = total > 0 ? Math.round(((total - comErro) / total) * 100) : 0;
+      const totalViews = userVideos.reduce((acc, v) => acc + (v.tiktokViews || 0), 0);
+      const totalLikes = userVideos.reduce((acc, v) => acc + (v.tiktokLikes || 0), 0);
 
       // Vídeos por dia (últimos 7 dias)
       const hoje = new Date();
@@ -192,21 +182,43 @@ export const videosRouter = router({
         const data = new Date(hoje);
         data.setDate(data.getDate() - i);
         const dataStr = data.toISOString().split('T')[0];
-        
+
         const count = userVideos.filter(v => {
           const videoData = v.criadoEm.toISOString().split('T')[0];
           return videoData === dataStr;
         }).length;
-        
-        videosPorDia.push({ data: dataStr, count });
+
+        videosPorDia.push({
+          data: dataStr,
+          count,
+          views: userVideos
+            .filter(v => v.criadoEm.toISOString().split('T')[0] === dataStr)
+            .reduce((acc, v) => acc + (v.tiktokViews || 0), 0),
+        });
       }
+
+      // Top nichos
+      const nichoCount: Record<string, { videos: number; views: number }> = {};
+      userVideos.forEach(v => {
+        if (!nichoCount[v.nicho]) nichoCount[v.nicho] = { videos: 0, views: 0 };
+        nichoCount[v.nicho].videos++;
+        nichoCount[v.nicho].views += v.tiktokViews || 0;
+      });
+
+      const topNichos = Object.entries(nichoCount)
+        .sort((a, b) => b[1].views - a[1].views)
+        .slice(0, 5)
+        .map(([nome, data]) => ({ nome, ...data }));
 
       return {
         total,
         publicados,
         comErro,
         taxaSucesso,
+        totalViews,
+        totalLikes,
         videosPorDia,
+        topNichos,
       };
     }),
 });

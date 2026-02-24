@@ -19,7 +19,12 @@ app.use(express.json());
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    service: 'TikFactory API',
+    timestamp: new Date().toISOString(),
+    scheduler: schedulerAtivo ? 'running' : 'paused',
+  });
 });
 
 // tRPC middleware
@@ -31,20 +36,22 @@ app.use(
   })
 );
 
-// Scheduler - verifica agendamentos a cada 60 segundos
+// ============================================================
+// SCHEDULER — Máquina de Vídeos TikTok Automática
+// Verifica agendamentos a cada 60 segundos
+// ============================================================
 let schedulerAtivo = true;
 
 cron.schedule('*/1 * * * *', async () => {
   if (!schedulerAtivo) {
-    console.log('⏸️ Scheduler pausado');
+    console.log('⏸️  Máquina de vídeos pausada');
     return;
   }
 
-  console.log('🔄 Verificando agendamentos...');
   const agora = new Date();
+  console.log(`🤖 [TikFactory] Verificando agendamentos... ${agora.toLocaleTimeString('pt-BR')}`);
 
   try {
-    // Buscar agendamentos pendentes
     const agendamentosPendentes = await db.query.agendamentos.findMany({
       where: and(
         eq(agendamentos.ativo, true),
@@ -52,42 +59,53 @@ cron.schedule('*/1 * * * *', async () => {
       ),
     });
 
-    console.log(`📋 ${agendamentosPendentes.length} agendamento(s) encontrado(s)`);
+    if (agendamentosPendentes.length > 0) {
+      console.log(`📋 ${agendamentosPendentes.length} agendamento(s) para processar`);
+    }
 
     for (const agendamento of agendamentosPendentes) {
-      console.log(`🎬 Processando agendamento: ${agendamento.tema}`);
+      console.log(`🎬 Iniciando geração automática — nicho: ${agendamento.nicho}`);
 
       try {
-        // Criar novo vídeo
+        // Criar novo vídeo TikTok automaticamente
         const videoId = randomUUID();
         await db.insert(videos).values({
           id: videoId,
           userId: agendamento.userId,
-          titulo: agendamento.tema,
-          tema: agendamento.tema,
+          titulo: `${agendamento.nicho} — ${new Date().toLocaleDateString('pt-BR')}`,
+          nicho: agendamento.nicho,
+          tema: agendamento.nicho,
           descricao: agendamento.descricao,
+          duracao: '30',
+          estiloNarracao: 'energetico',
           status: 'pendente',
           hashtags: [],
+          usarIA: true,
+          legendasAnimadas: true,
+          musicaTrending: true,
+          efeitos: true,
+          autoPublicar: true,
         });
 
-        // Criar log
+        // Log de criação automática
         await db.insert(logs).values({
           id: randomUUID(),
           userId: agendamento.userId,
-          videoId: videoId,
+          videoId,
           tipo: 'info',
           etapa: 'geral',
-          mensagem: `Vídeo criado automaticamente pelo agendamento: ${agendamento.tema}`,
+          mensagem: `🤖 Vídeo TikTok criado automaticamente pelo agendador`,
+          detalhes: `Nicho: ${agendamento.nicho} | Frequência: ${agendamento.tipo} | Horário: ${agendamento.horario}`,
         });
 
-        // Atualizar última execução
+        // Atualizar contador e próxima execução
         let novaProximaExecucao: Date | null = null;
         let ativo = true;
 
         switch (agendamento.tipo) {
           case 'uma_vez':
             ativo = false;
-            novaProximaExecucao = null;
+            novaProximaExecucao = new Date(agora); // Manter data para referência
             break;
           case 'diaria':
             novaProximaExecucao = new Date(agora);
@@ -103,48 +121,75 @@ cron.schedule('*/1 * * * *', async () => {
             break;
         }
 
+        // Ajustar horário da próxima execução
+        if (novaProximaExecucao && agendamento.horario) {
+          const [hora, minuto] = agendamento.horario.split(':').map(Number);
+          novaProximaExecucao.setHours(hora, minuto, 0, 0);
+        }
+
         await db.update(agendamentos)
           .set({
             ultimaExecucao: agora,
-            proximaExecucao: novaProximaExecucao,
+            proximaExecucao: novaProximaExecucao || agora,
             ativo,
+            videosGerados: (agendamento.videosGerados || 0) + 1,
           })
           .where(eq(agendamentos.id, agendamento.id));
 
-        console.log(`✅ Agendamento processado: ${agendamento.tema}`);
+        console.log(`✅ Agendamento processado — nicho: ${agendamento.nicho}, vídeo: ${videoId}`);
+
+        // TODO: Disparar pipeline automaticamente
+        // await executePipeline(videoId, agendamento.userId);
 
       } catch (error) {
         console.error(`❌ Erro ao processar agendamento ${agendamento.id}:`, error);
+
+        await db.insert(logs).values({
+          id: randomUUID(),
+          userId: agendamento.userId,
+          tipo: 'erro',
+          etapa: 'geral',
+          mensagem: `Erro no agendamento automático — nicho: ${agendamento.nicho}`,
+          detalhes: error instanceof Error ? error.message : 'Erro desconhecido',
+        });
       }
     }
   } catch (error) {
-    console.error('❌ Erro no scheduler:', error);
+    console.error('❌ Erro no scheduler TikFactory:', error);
   }
 });
 
-// Rota para controlar o scheduler
+// ============================================================
+// ROTAS DE CONTROLE DO SCHEDULER
+// ============================================================
 app.post('/scheduler/:acao', (req, res) => {
   const { acao } = req.params;
 
   if (acao === 'start') {
     schedulerAtivo = true;
-    res.json({ status: 'ok', message: 'Scheduler ativado' });
+    console.log('▶️  Máquina de vídeos ativada');
+    res.json({ status: 'ok', message: 'Máquina de vídeos TikTok ativada' });
   } else if (acao === 'stop') {
     schedulerAtivo = false;
-    res.json({ status: 'ok', message: 'Scheduler pausado' });
+    console.log('⏸️  Máquina de vídeos pausada');
+    res.json({ status: 'ok', message: 'Máquina de vídeos TikTok pausada' });
   } else {
-    res.status(400).json({ status: 'error', message: 'Ação inválida' });
+    res.status(400).json({ status: 'error', message: 'Ação inválida. Use "start" ou "stop".' });
   }
 });
 
-// Rota para status do scheduler
 app.get('/scheduler/status', (req, res) => {
-  res.json({ ativo: schedulerAtivo });
+  res.json({
+    ativo: schedulerAtivo,
+    service: 'TikFactory Scheduler',
+    timestamp: new Date().toISOString(),
+  });
 });
 
-// Iniciar servidor
+// ============================================================
+// INICIAR SERVIDOR
+// ============================================================
 async function startServer() {
-  // Testar conexão com banco de dados
   const conectado = await testConnection();
 
   if (!conectado) {
@@ -153,9 +198,15 @@ async function startServer() {
   }
 
   app.listen(PORT, () => {
-    console.log(`🚀 Servidor rodando na porta ${PORT}`);
-    console.log(`📡 tRPC endpoint: http://localhost:${PORT}/trpc`);
-    console.log(`⏰ Scheduler: ${schedulerAtivo ? 'ativo' : 'inativo'}`);
+    console.log('');
+    console.log('🚀 ================================');
+    console.log('   TikFactory — Máquina de Vídeos');
+    console.log('================================');
+    console.log(`📡 API:       http://localhost:${PORT}`);
+    console.log(`🔌 tRPC:      http://localhost:${PORT}/trpc`);
+    console.log(`⚙️  Scheduler: ${schedulerAtivo ? '▶️  Ativo' : '⏸️  Pausado'}`);
+    console.log('================================');
+    console.log('');
   });
 }
 

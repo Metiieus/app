@@ -2,41 +2,43 @@ import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { db } from '../db';
 import { agendamentos, logs } from '../../database/schema';
-import { eq, and, desc, gte } from 'drizzle-orm';
+import { eq, and, desc, lte } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
-// Schema de validação para criação de agendamento
+// Schema de validação para criação de agendamento TikTok
 const createAgendamentoSchema = z.object({
-  tema: z.string().min(1, 'Tema é obrigatório'),
+  nicho: z.string().min(1, 'Nicho é obrigatório'),
   descricao: z.string().min(1, 'Descrição é obrigatória'),
   tipo: z.enum(['uma_vez', 'diaria', 'semanal', 'mensal']),
+  horario: z.string().default('18:00'),
   proximaExecucao: z.date(),
 });
 
 export const agendamentosRouter = router({
-  // Criar novo agendamento
+  // Criar novo agendamento TikTok
   create: protectedProcedure
     .input(createAgendamentoSchema)
     .mutation(async ({ ctx, input }) => {
       const agendamentoId = randomUUID();
-      
+
       await db.insert(agendamentos).values({
         id: agendamentoId,
         userId: ctx.user!.id,
-        tema: input.tema,
+        nicho: input.nicho,
         descricao: input.descricao,
         tipo: input.tipo,
+        horario: input.horario,
         proximaExecucao: input.proximaExecucao,
         ativo: true,
+        videosGerados: 0,
       });
 
-      // Criar log
       await db.insert(logs).values({
         id: randomUUID(),
         userId: ctx.user!.id,
         tipo: 'info',
         etapa: 'geral',
-        mensagem: `Agendamento "${input.tema}" criado com sucesso`,
+        mensagem: `Agendamento TikTok criado — nicho: ${input.nicho}, frequência: ${input.tipo}, horário: ${input.horario}`,
       });
 
       return { success: true, agendamentoId };
@@ -49,24 +51,19 @@ export const agendamentosRouter = router({
         where: eq(agendamentos.userId, ctx.user!.id),
         orderBy: desc(agendamentos.criadoEm),
       });
-
       return items;
     }),
 
   // Listar agendamentos pendentes (para o scheduler)
   listPendentes: protectedProcedure
-    .query(async ({ ctx }) => {
+    .query(async () => {
       const agora = new Date();
-      
       const items = await db.query.agendamentos.findMany({
         where: and(
-          eq(agendamentos.userId, ctx.user!.id),
           eq(agendamentos.ativo, true),
-          gte(agendamentos.proximaExecucao, agora)
+          lte(agendamentos.proximaExecucao, agora)
         ),
-        orderBy: desc(agendamentos.proximaExecucao),
       });
-
       return items;
     }),
 
@@ -74,9 +71,10 @@ export const agendamentosRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.string(),
-      tema: z.string().optional(),
+      nicho: z.string().optional(),
       descricao: z.string().optional(),
       tipo: z.enum(['uma_vez', 'diaria', 'semanal', 'mensal']).optional(),
+      horario: z.string().optional(),
       proximaExecucao: z.date().optional(),
       ativo: z.boolean().optional(),
     }))
@@ -87,16 +85,6 @@ export const agendamentosRouter = router({
         .set(data)
         .where(and(eq(agendamentos.id, id), eq(agendamentos.userId, ctx.user!.id)));
 
-      // Criar log
-      await db.insert(logs).values({
-        id: randomUUID(),
-        userId: ctx.user!.id,
-        tipo: 'info',
-        etapa: 'geral',
-        mensagem: `Agendamento atualizado`,
-        detalhes: JSON.stringify(data),
-      });
-
       return { success: true };
     }),
 
@@ -106,15 +94,6 @@ export const agendamentosRouter = router({
     .mutation(async ({ ctx, input }) => {
       await db.delete(agendamentos)
         .where(and(eq(agendamentos.id, input.id), eq(agendamentos.userId, ctx.user!.id)));
-
-      // Criar log
-      await db.insert(logs).values({
-        id: randomUUID(),
-        userId: ctx.user!.id,
-        tipo: 'info',
-        etapa: 'geral',
-        mensagem: `Agendamento deletado`,
-      });
 
       return { success: true };
     }),
@@ -140,13 +119,12 @@ export const agendamentosRouter = router({
         .set({ ativo: novoStatus })
         .where(and(eq(agendamentos.id, input.id), eq(agendamentos.userId, ctx.user!.id)));
 
-      // Criar log
       await db.insert(logs).values({
         id: randomUUID(),
         userId: ctx.user!.id,
         tipo: 'info',
         etapa: 'geral',
-        mensagem: `Agendamento ${novoStatus ? 'ativado' : 'pausado'}`,
+        mensagem: `Agendamento ${novoStatus ? '▶️ ativado' : '⏸️ pausado'} — nicho: ${agendamento.nicho}`,
       });
 
       return { success: true, ativo: novoStatus };

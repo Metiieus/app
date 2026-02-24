@@ -1,10 +1,18 @@
-# RPmon Dashboard
+# TikFactory 🎬
 
-Sistema web completo para automatizar a criação e publicação de vídeos YouTube Shorts com temática Pokémon + RPG.
+**Máquina de vídeos automática para TikTok** — gera, narra, monta e publica vídeos virais no piloto automático.
 
-## 🎯 Objetivo
+## 🎯 O que é?
 
-O RPmon Dashboard é uma plataforma que integra IA, síntese de voz, processamento de vídeo e agendamento automático para criar conteúdo de forma automatizada.
+O TikFactory é uma plataforma full-stack que integra IA, síntese de voz, processamento de vídeo e agendamento automático para criar conteúdo viral para TikTok de forma totalmente automatizada.
+
+Com ele você pode:
+- Gerar roteiros virais com **Gemini AI** em segundos
+- Criar narração realista com **Edge TTS** (voz brasileira)
+- Gerar imagens verticais **9:16** com **DALL-E**
+- Montar vídeos **1080x1920** com **FFmpeg** + legendas animadas
+- Publicar automaticamente via **TikTok API**
+- Agendar publicações diárias, semanais ou mensais
 
 ## 🚀 Tecnologias
 
@@ -12,24 +20,24 @@ O RPmon Dashboard é uma plataforma que integra IA, síntese de voz, processamen
 - React 19 + TypeScript
 - Tailwind CSS 4
 - shadcn/ui (40+ componentes)
-- tRPC Client
-- React Query
+- tRPC Client + React Query
 - Recharts (gráficos)
 
 ### Backend
 - Node.js + Express 4
-- tRPC 11
-- Drizzle ORM
-- MySQL/TiDB
-- Zod (validação)
+- tRPC 11 + Zod
+- Drizzle ORM + MySQL/TiDB
+- node-cron (scheduler)
 
 ### Integrações
-- Gemini API (geração de roteiros)
-- Edge TTS (síntese de voz)
-- DALL-E (geração de imagens)
-- YouTube API (publicação)
-- FFmpeg (montagem de vídeo)
-- Pillow (geração de thumbnails)
+| Serviço | Uso | Obrigatório |
+|---------|-----|-------------|
+| Gemini AI | Geração de roteiros virais | ✅ Sim |
+| Edge TTS | Síntese de voz em português | ✅ Sim |
+| TikTok API | Publicação automática | ✅ Para autopublicação |
+| DALL-E (OpenAI) | Geração de imagens 9:16 | Opcional |
+| ElevenLabs | Narração ultra-realista | Opcional |
+| FFmpeg | Montagem de vídeo | ✅ Sim |
 
 ## 📁 Estrutura do Projeto
 
@@ -37,21 +45,17 @@ O RPmon Dashboard é uma plataforma que integra IA, síntese de voz, processamen
 app/
 ├── backend/           # Backend Node.js + Express + tRPC
 │   ├── src/
-│   │   ├── routers/   # Routers tRPC (videos, agendamentos, logs, etc)
-│   │   ├── db/        # Configuração do Drizzle ORM
-│   │   ├── server.ts  # Servidor Express
+│   │   ├── routers/   # Routers tRPC (videos, agendamentos, pipeline, logs)
+│   │   ├── db/        # Configuração Drizzle ORM
+│   │   ├── server.ts  # Servidor + Scheduler automático
 │   │   └── trpc.ts    # Configuração tRPC
-│   ├── tests/         # Testes unitários (Vitest)
 │   └── package.json
-├── database/          # Schema do banco de dados
-│   └── schema.ts      # Definição das 6 tabelas
-├── shared/            # Tipos compartilhados
-│   └── types/
+├── database/
+│   └── schema.ts      # Schema do banco (6 tabelas)
 ├── src/               # Frontend React
-│   ├── pages/         # 7 páginas do sistema
-│   ├── components/    # Componentes reutilizáveis
-│   ├── lib/           # Utilitários (tRPC, etc)
-│   └── hooks/         # Custom hooks
+│   ├── pages/         # 6 páginas (Home, Criar, Histórico, Agendador, Painel, Config)
+│   ├── components/    # Layout, UI components
+│   └── lib/           # tRPC client
 └── package.json
 ```
 
@@ -59,14 +63,15 @@ app/
 
 ### Pré-requisitos
 - Node.js 20+
-- MySQL 8.0+
-- FFmpeg (opcional, para processamento de vídeo)
+- MySQL 8.0+ (ou TiDB)
+- FFmpeg (`apt-get install ffmpeg`)
+- Python 3.8+ com edge-tts (`pip install edge-tts`)
 
 ### 1. Clone o repositório
 
 ```bash
-git clone https://github.com/seu-usuario/rpmon-dashboard.git
-cd rpmon-dashboard
+git clone https://github.com/Metiieus/app.git
+cd app
 ```
 
 ### 2. Configure o Backend
@@ -74,15 +79,15 @@ cd rpmon-dashboard
 ```bash
 cd backend
 cp .env.example .env
-# Edite .env com suas configurações
+# Edite .env com suas chaves de API
 npm install
 ```
 
 ### 3. Configure o Banco de Dados
 
 ```bash
-# Crie o banco de dados no MySQL
-mysql -u root -p -e "CREATE DATABASE rpmon_dashboard;"
+# Crie o banco de dados
+mysql -u root -p -e "CREATE DATABASE tikfactory;"
 
 # Execute as migrations
 npm run db:migrate
@@ -98,126 +103,101 @@ npm install
 ### 5. Inicie o sistema
 
 ```bash
-# Terminal 1 - Backend
-cd backend
-npm run dev
+# Terminal 1 — Backend
+cd backend && npm run dev
 
-# Terminal 2 - Frontend
-cd ..
+# Terminal 2 — Frontend
 npm run dev
 ```
 
-O sistema estará disponível em:
-- Frontend: http://localhost:5173
-- Backend: http://localhost:3001
-- tRPC: http://localhost:3001/trpc
+Acesse em:
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:3001
+- **tRPC**: http://localhost:3001/trpc
 
 ## 🔑 Configuração de APIs
 
-Acesse a página **Configurações** no dashboard e configure:
+Acesse **Configurações** no dashboard e configure:
 
-1. **GEMINI_API_KEY**: Obtenha em [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. **OPENAI_API_KEY**: Obtenha em [OpenAI Platform](https://platform.openai.com/api-keys)
-3. **YOUTUBE_API_KEY**: Obtenha em [Google Cloud Console](https://console.cloud.google.com/)
-4. **YOUTUBE_REFRESH_TOKEN**: Siga o [guia de OAuth2](https://developers.google.com/youtube/v3/guides/authentication)
+1. **GEMINI_API_KEY** — [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. **TIKTOK_CLIENT_KEY** + **TIKTOK_CLIENT_SECRET** — [TikTok Developers](https://developers.tiktok.com)
+3. **TIKTOK_ACCESS_TOKEN** — Gerado via OAuth2 do TikTok
+4. **OPENAI_API_KEY** — [OpenAI Platform](https://platform.openai.com/api-keys) (opcional)
+5. **ELEVENLABS_API_KEY** — [ElevenLabs](https://elevenlabs.io) (opcional)
 
 ## 📊 Funcionalidades
 
-### Dashboard
-- Estatísticas em tempo real
-- Gráfico de tendências
+### 🏠 Dashboard
+- Métricas em tempo real (vídeos, views, likes)
+- Gráfico de produção dos últimos 7 dias
+- Top nichos por performance
 - Ações rápidas
 
-### Criar Vídeo
-- Formulário intuitivo
-- Geração de roteiro com IA
-- Síntese de voz
-- Geração de imagens (DALL-E)
-- Barra de progresso
+### 🎬 Criar Vídeo
+- 12 nichos disponíveis (Motivacional, Curiosidades, Finanças, etc.)
+- Duração: 15s, 30s ou 60s
+- Estilos de narração: Energético, Calmo, Dramático, Informativo
+- Hook inicial personalizável
+- Opções: Legendas animadas, Música trending, Efeitos visuais, Auto-publicar
 
-### Histórico
-- Tabela com filtros
-- Visualização de detalhes
-- Player de vídeo integrado
-- Ações: Repostar, Regenerar, Deletar
+### 📋 Histórico
+- Tabela com filtros por status e busca
+- Métricas TikTok (views, likes) por vídeo
+- Preview do roteiro e hashtags
+- Ações: Ver, Regenerar, Compartilhar, Deletar
 
-### Agendador
-- Calendário visual
-- Recorrência: Uma vez, Diária, Semanal, Mensal
-- Lista de agendamentos
-- Ativar/Pausar/Deletar
+### ⏰ Agendador
+- Frequência: Uma vez, Diária, Semanal, Mensal
+- Horários otimizados para TikTok (07h, 12h, 18h, 21h)
+- Controle de pausa/ativação por agendamento
+- Contador de vídeos gerados
 
-### Painel de Controle
-- Logs em tempo real (atualiza a cada 5s)
-- Filtros por tipo e etapa
+### 🖥️ Painel de Controle
+- Logs em tempo real do pipeline
+- Filtros por tipo (info, sucesso, erro, aviso) e etapa
+- Status da máquina de vídeos
 - Exportação CSV
-- Status do scheduler
 
-### Configurações
-- Gerenciamento de chaves de API
-- Teste de conexão
-- Histórico de alterações
+### ⚙️ Configurações
+- Gerenciamento de todas as chaves de API
+- Teste de conexão por chave
+- Links diretos para obter cada chave
 
-### Teste de Módulos
-- Teste individual de cada componente
-- Medição de tempo de execução
-- Visualização de output
+## 🔄 Pipeline de Geração
 
-## 🧪 Testes
-
-```bash
-cd backend
-npm test
 ```
-
-O sistema inclui 14+ testes unitários cobrindo:
-- CRUD de vídeos
-- CRUD de agendamentos
-- Geração de logs
-- Configurações de API
+1. Roteiro (Gemini AI)
+   ↓ Hook viral + roteiro otimizado para TikTok
+2. Narração (Edge TTS)
+   ↓ Voz brasileira pt-BR, estilo configurável
+3. Imagens (DALL-E)
+   ↓ Formato 9:16 (1080x1920), otimizado por nicho
+4. Vídeo (FFmpeg)
+   ↓ MP4 1080x1920 30fps + legendas animadas
+5. Thumbnail
+   ↓ Capa atrativa gerada automaticamente
+6. Publicação (TikTok API)
+   ↓ Upload + hashtags + configurações de privacidade
+```
 
 ## 🚀 Deploy
 
-### Build
-
 ```bash
-# Frontend
+# Build do Frontend
 npm run build
 
-# Backend
-cd backend
-npm run build
+# Build do Backend
+cd backend && npm run build
+
+# Iniciar em produção
+npm start
 ```
-
-### Deploy em Produção
-
-1. Configure as variáveis de ambiente no servidor
-2. Execute as migrations do banco de dados
-3. Inicie o backend: `npm start`
-4. Sirva o frontend (pasta `dist/`) com nginx ou similar
-
-## 📝 Documentação Adicional
-
-- [Guia de Uso](GUIA_USO.md) - Instruções detalhadas para usuários
-- [Documentação Técnica](DOCUMENTACAO_COMPLETA.md) - Arquitetura e APIs
-
-## 🤝 Contribuição
-
-1. Fork o projeto
-2. Crie uma branch (`git checkout -b feature/nova-feature`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
-4. Push para a branch (`git push origin feature/nova-feature`)
-5. Abra um Pull Request
 
 ## 📄 Licença
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
-
-## 👨‍💻 Autor
-
-Desenvolvido com ❤️ para a comunidade Pokémon + RPG.
+MIT License — veja [LICENSE](LICENSE) para detalhes.
 
 ---
 
-**Versão**: 1.0.0  
+**Versão**: 2.0.0 (TikTok Edition)
 **Última atualização**: Fevereiro 2026
